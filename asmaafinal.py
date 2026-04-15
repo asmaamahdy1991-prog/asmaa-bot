@@ -24,8 +24,7 @@ WEBHOOK_PATH = "/webhook"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "my_super_secret_token")
 WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
 
-if not TOKEN:
-    raise ValueError("BOT_TOKEN is missing")
+print("TOKEN VALUE:", TOKEN)
 if not BASE_URL:
     raise ValueError("BASE_URL is missing")
 
