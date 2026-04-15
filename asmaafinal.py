@@ -18,7 +18,7 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 # =========================
 # إعدادات عامة
 # =========================
-TOKEN = os.getenv("8752368326:AAGUopi829dp87X3HDiwfALE44Hpg1dOwBE")
+TTOKEN = os.getenv("BOT_TOKEN")
 BASE_URL = os.getenv("BASE_URL")  # مثال: https://your-bot.onrender.com
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "my_super_secret_token")
