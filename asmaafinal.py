@@ -18,13 +18,19 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 # =========================
 # إعدادات عامة
 # =========================
-TTOKEN = os.getenv("BOT_TOKEN")
-BASE_URL = os.getenv("BASE_URL")  # مثال: https://your-bot.onrender.com
+import os
+
+TOKEN = os.getenv("BOT_TOKEN")
+BASE_URL = os.getenv("BASE_URL")
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "my_super_secret_token")
 WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
 
-print("TOKEN VALUE:", TOKEN)
+print("BOT_TOKEN loaded:", bool(TOKEN))
+print("BASE_URL loaded:", BASE_URL)
+
+if not TOKEN:
+    raise ValueError("BOT_TOKEN is missing")
 if not BASE_URL:
     raise ValueError("BASE_URL is missing")
 
