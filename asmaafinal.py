@@ -174,8 +174,8 @@ async def update_list_message(bot: Bot, chat_id: int):
             text=build_list_text(chat_id),
             reply_markup=get_inline_keyboard()
         )
-    except Exception:
-        pass
+    except Exception as e:
+        print("update_list_message error:", repr(e))
 
 
 # =========================
@@ -183,76 +183,96 @@ async def update_list_message(bot: Bot, chat_id: int):
 # =========================
 @dp.message(Command("start"))
 async def start(message: Message, bot: Bot):
-    if not await is_group_admin(bot, message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا البوت يعمل فقط بواسطة الأدمنز في الجروب")
-        return
+    try:
+        if not await is_group_admin(bot, message.chat.id, message.from_user.id):
+            await message.answer("❌ هذا البوت يعمل فقط بواسطة الأدمنز في الجروب")
+            return
 
-    await message.answer(
-        "✅ تم تفعيل لوحة تحكم الأدمن",
-        reply_markup=get_admin_reply_keyboard()
-    )
+        await message.answer(
+            "✅ تم تفعيل لوحة تحكم الأدمن",
+            reply_markup=get_admin_reply_keyboard()
+        )
+    except Exception as e:
+        print("start error:", repr(e))
+        await message.answer("حدث خطأ داخلي")
 
 
 @dp.message(F.text.contains("عرض القائمة"))
 async def show_list(message: Message, bot: Bot):
-    if not await is_group_admin(bot, message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا الزر للأدمن فقط")
-        return
+    try:
+        if not await is_group_admin(bot, message.chat.id, message.from_user.id):
+            await message.answer("❌ هذا الزر للأدمن فقط")
+            return
 
-    data = get_group_data(message.chat.id)
+        data = get_group_data(message.chat.id)
 
-    if not data["list_message_id"]:
-        await create_and_pin_list_message(bot, message.chat.id)
-        await message.answer("📌 تم إنشاء القائمة")
-    else:
-        await update_list_message(bot, message.chat.id)
-        await message.answer("✅ تم تحديث القائمة")
+        if not data["list_message_id"]:
+            await create_and_pin_list_message(bot, message.chat.id)
+            await message.answer("📌 تم إنشاء القائمة")
+        else:
+            await update_list_message(bot, message.chat.id)
+            await message.answer("✅ تم تحديث القائمة")
+    except Exception as e:
+        print("show_list error:", repr(e))
+        await message.answer("حدث خطأ داخلي")
 
 
 @dp.message(F.text.contains("تحديث القائمة"))
 async def refresh_list(message: Message, bot: Bot):
-    if not await is_group_admin(bot, message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا الزر للأدمن فقط")
-        return
+    try:
+        if not await is_group_admin(bot, message.chat.id, message.from_user.id):
+            await message.answer("❌ هذا الزر للأدمن فقط")
+            return
 
-    await update_list_message(bot, message.chat.id)
-    await message.answer("🔄 تم تحديث القائمة")
+        await update_list_message(bot, message.chat.id)
+        await message.answer("🔄 تم تحديث القائمة")
+    except Exception as e:
+        print("refresh_list error:", repr(e))
+        await message.answer("حدث خطأ داخلي")
 
 
 @dp.message(F.text.contains("بدء حلقة جديدة"))
 async def new_session(message: Message, bot: Bot):
-    if not await is_group_admin(bot, message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا الزر للأدمن فقط")
-        return
+    try:
+        if not await is_group_admin(bot, message.chat.id, message.from_user.id):
+            await message.answer("❌ هذا الزر للأدمن فقط")
+            return
 
-    data = get_group_data(message.chat.id)
-    data["attendance"].clear()
-    data["is_open"] = False
+        data = get_group_data(message.chat.id)
+        data["attendance"].clear()
+        data["is_open"] = False
 
-    if data["list_message_id"]:
-        await update_list_message(bot, message.chat.id)
-    else:
-        await create_and_pin_list_message(bot, message.chat.id)
+        if data["list_message_id"]:
+            await update_list_message(bot, message.chat.id)
+        else:
+            await create_and_pin_list_message(bot, message.chat.id)
 
-    await message.answer("🆕 تم بدء حلقة جديدة")
+        await message.answer("🆕 تم بدء حلقة جديدة")
+    except Exception as e:
+        print("new_session error:", repr(e))
+        await message.answer("حدث خطأ داخلي")
 
 
 @dp.message(Command("reset"))
 async def reset_list(message: Message, bot: Bot):
-    if not await is_group_admin(bot, message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا الأمر للأدمن فقط")
-        return
+    try:
+        if not await is_group_admin(bot, message.chat.id, message.from_user.id):
+            await message.answer("❌ هذا الأمر للأدمن فقط")
+            return
 
-    data = get_group_data(message.chat.id)
-    data["attendance"].clear()
-    data["is_open"] = False
+        data = get_group_data(message.chat.id)
+        data["attendance"].clear()
+        data["is_open"] = False
 
-    if data["list_message_id"]:
-        await update_list_message(bot, message.chat.id)
-    else:
-        await create_and_pin_list_message(bot, message.chat.id)
+        if data["list_message_id"]:
+            await update_list_message(bot, message.chat.id)
+        else:
+            await create_and_pin_list_message(bot, message.chat.id)
 
-    await message.answer("❌ تم مسح جميع الأسماء وإغلاق القائمة")
+        await message.answer("❌ تم مسح جميع الأسماء وإغلاق القائمة")
+    except Exception as e:
+        print("reset_list error:", repr(e))
+        await message.answer("حدث خطأ داخلي")
 
 
 # =========================
@@ -260,89 +280,103 @@ async def reset_list(message: Message, bot: Bot):
 # =========================
 @dp.callback_query()
 async def handle_buttons(callback: CallbackQuery, bot: Bot):
-    chat_id = callback.message.chat.id
-    user_id = callback.from_user.id
-    user_name = callback.from_user.full_name
-
-    data = get_group_data(chat_id)
-
-    if callback.data == "open_list":
-        if not await is_group_admin(bot, chat_id, user_id):
-            await callback.answer("❌ هذا الزر للأدمن فقط", show_alert=True)
-            return
-        data["is_open"] = True
-        await update_list_message(bot, chat_id)
-        await callback.answer("✅ تم فتح القائمة")
-
-    elif callback.data == "close_list":
-        if not await is_group_admin(bot, chat_id, user_id):
-            await callback.answer("❌ هذا الزر للأدمن فقط", show_alert=True)
-            return
-        data["is_open"] = False
-        await update_list_message(bot, chat_id)
-        await callback.answer("🔒 تم غلق القائمة")
-
-    elif callback.data == "register":
-        if not data["is_open"]:
-            await callback.answer("❌ القائمة مغلقة", show_alert=True)
+    try:
+        if not callback.message:
+            await callback.answer("حدث خطأ داخلي", show_alert=True)
             return
 
-        data["attendance"][user_id] = {
-            "name": user_name,
-            "type": "student",
-        }
-        await update_list_message(bot, chat_id)
-        await callback.answer("✅ تم تسجيلك")
+        chat_id = callback.message.chat.id
+        user_id = callback.from_user.id
+        user_name = callback.from_user.full_name
 
-    elif callback.data == "teacher":
-        if not data["is_open"]:
-            await callback.answer("❌ القائمة مغلقة", show_alert=True)
-            return
+        data = get_group_data(chat_id)
 
-        data["attendance"][user_id] = {
-            "name": user_name,
-            "type": "teacher",
-        }
-        await update_list_message(bot, chat_id)
-        await callback.answer("📚 تم تسجيلك كمعلمة")
+        if callback.data == "open_list":
+            if not await is_group_admin(bot, chat_id, user_id):
+                await callback.answer("❌ هذا الزر للأدمن فقط", show_alert=True)
+                return
 
-    elif callback.data == "listener":
-        if not data["is_open"]:
-            await callback.answer("❌ القائمة مغلقة", show_alert=True)
-            return
-
-        data["attendance"][user_id] = {
-            "name": user_name,
-            "type": "listener",
-        }
-        await update_list_message(bot, chat_id)
-        await callback.answer("🎧 تم تسجيلك كمستمعة")
-
-    elif callback.data == "read":
-        if not data["is_open"]:
-            await callback.answer("❌ القائمة مغلقة", show_alert=True)
-            return
-
-        if user_id not in data["attendance"]:
-            await callback.answer("❌ سجلي اسمك أولًا", show_alert=True)
-            return
-
-        if not data["attendance"][user_id]["name"].endswith(" ✅"):
-            data["attendance"][user_id]["name"] += " ✅"
-
-        await update_list_message(bot, chat_id)
-        await callback.answer("✅ تم وضع علامة قرأت")
-
-    elif callback.data == "delete_name":
-        if user_id in data["attendance"]:
-            del data["attendance"][user_id]
+            data["is_open"] = True
             await update_list_message(bot, chat_id)
-            await callback.answer("❌ تم حذف اسمك")
-        else:
-            await callback.answer("الاسم غير موجود", show_alert=True)
+            await callback.answer("✅ تم فتح القائمة")
 
-    else:
-        await callback.answer()
+        elif callback.data == "close_list":
+            if not await is_group_admin(bot, chat_id, user_id):
+                await callback.answer("❌ هذا الزر للأدمن فقط", show_alert=True)
+                return
+
+            data["is_open"] = False
+            await update_list_message(bot, chat_id)
+            await callback.answer("🔒 تم غلق القائمة")
+
+        elif callback.data == "register":
+            if not data["is_open"]:
+                await callback.answer("❌ القائمة مغلقة", show_alert=True)
+                return
+
+            data["attendance"][user_id] = {
+                "name": user_name,
+                "type": "student",
+            }
+            await update_list_message(bot, chat_id)
+            await callback.answer("✅ تم تسجيلك")
+
+        elif callback.data == "teacher":
+            if not data["is_open"]:
+                await callback.answer("❌ القائمة مغلقة", show_alert=True)
+                return
+
+            data["attendance"][user_id] = {
+                "name": user_name,
+                "type": "teacher",
+            }
+            await update_list_message(bot, chat_id)
+            await callback.answer("📚 تم تسجيلك كمعلمة")
+
+        elif callback.data == "listener":
+            if not data["is_open"]:
+                await callback.answer("❌ القائمة مغلقة", show_alert=True)
+                return
+
+            data["attendance"][user_id] = {
+                "name": user_name,
+                "type": "listener",
+            }
+            await update_list_message(bot, chat_id)
+            await callback.answer("🎧 تم تسجيلك كمستمعة")
+
+        elif callback.data == "read":
+            if not data["is_open"]:
+                await callback.answer("❌ القائمة مغلقة", show_alert=True)
+                return
+
+            if user_id not in data["attendance"]:
+                await callback.answer("❌ سجلي اسمك أولًا", show_alert=True)
+                return
+
+            if not data["attendance"][user_id]["name"].endswith(" ✅"):
+                data["attendance"][user_id]["name"] += " ✅"
+
+            await update_list_message(bot, chat_id)
+            await callback.answer("✅ تم وضع علامة قرأت")
+
+        elif callback.data == "delete_name":
+            if user_id in data["attendance"]:
+                del data["attendance"][user_id]
+                await update_list_message(bot, chat_id)
+                await callback.answer("❌ تم حذف اسمك")
+            else:
+                await callback.answer("الاسم غير موجود", show_alert=True)
+
+        else:
+            await callback.answer()
+
+    except Exception as e:
+        print("Callback error:", repr(e))
+        try:
+            await callback.answer("حدث خطأ داخلي", show_alert=True)
+        except Exception:
+            pass
 
 
 # =========================
