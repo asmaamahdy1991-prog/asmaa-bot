@@ -178,9 +178,23 @@ async def start(message: Message, bot: Bot):
     await message.answer("تم التفعيل", reply_markup=get_admin_reply_keyboard())
 
 
-@dp.message(F.text == "📋 عرض القائمة")
+# 🔥 تم إصلاح المشكلة هنا (بدل == استخدم contains)
+@dp.message(F.text.contains("عرض القائمة"))
 async def show_list(message: Message, bot: Bot):
     await create_and_pin_list_message(bot, message.chat.id)
+
+
+@dp.message(F.text.contains("تحديث القائمة"))
+async def refresh_list(message: Message, bot: Bot):
+    await update_list_message(bot, message.chat.id)
+
+
+@dp.message(F.text.contains("بدء حلقة جديدة"))
+async def new_session(message: Message, bot: Bot):
+    data = get_group_data(message.chat.id)
+    data["attendance"] = {}
+    await update_list_message(bot, message.chat.id)
+    await message.answer("✅ تم بدء حلقة جديدة")
 
 
 # =========================
