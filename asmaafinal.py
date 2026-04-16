@@ -8,6 +8,7 @@ from aiogram.types import (
     CallbackQuery,
     ReplyKeyboardMarkup,
     KeyboardButton,
+    ErrorEvent,
 )
 from aiogram.filters import Command
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
@@ -53,7 +54,8 @@ async def is_group_admin(bot: Bot, chat_id: int, user_id: int) -> bool:
     try:
         member = await bot.get_chat_member(chat_id, user_id)
         return member.status in ["administrator", "creator"]
-    except Exception:
+    except Exception as e:
+        print("is_group_admin error:", repr(e))
         return False
 
 
@@ -157,8 +159,8 @@ async def create_and_pin_list_message(bot: Bot, chat_id: int):
 
     try:
         await bot.pin_chat_message(chat_id, sent.message_id)
-    except Exception:
-        pass
+    except Exception as e:
+        print("pin_chat_message error:", repr(e))
 
 
 async def update_list_message(bot: Bot, chat_id: int):
@@ -377,6 +379,15 @@ async def handle_buttons(callback: CallbackQuery, bot: Bot):
             await callback.answer("حدث خطأ داخلي", show_alert=True)
         except Exception:
             pass
+
+
+# =========================
+# Global Error Handler
+# =========================
+@dp.errors()
+async def global_error_handler(event: ErrorEvent):
+    print("GLOBAL ERROR:", repr(event.exception))
+    return True
 
 
 # =========================
