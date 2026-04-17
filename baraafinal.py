@@ -155,9 +155,18 @@ async def update_list_message(chat_id: int):
             reply_markup=get_inline_keyboard(),
         )
         return True
+
     except Exception as e:
-        if "message is not modified" not in str(e):
-            print("update_list_message error:", repr(e))
+        error_text = str(e)
+
+        if "message is not modified" in error_text:
+            return True
+
+        if "message to edit not found" in error_text or "message can't be edited" in error_text:
+            data["list_message_id"] = None
+            return False
+
+        print("update_list_message error:", repr(e))
         return False
 
 
