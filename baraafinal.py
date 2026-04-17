@@ -369,7 +369,9 @@ async def handle_buttons(callback: CallbackQuery):
 
     else:
         await callback.answer()
-
+@dp.message()
+async def fallback_message(message: Message):
+    await message.answer("✅ البوت يعمل، لكن هذه الرسالة غير مخصصة له")
 
 async def main():
     print("Bot is starting with polling...")
