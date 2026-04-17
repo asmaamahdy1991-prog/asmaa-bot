@@ -184,12 +184,16 @@ async def show_list(message: Message):
     if not data["list_message_id"]:
         await create_and_pin_list_message(message.chat.id)
         await message.answer("📌 تم إنشاء القائمة")
+        return
+
+    updated = await update_list_message(message.chat.id)
+
+    if not updated:
+        data["list_message_id"] = None
+        await create_and_pin_list_message(message.chat.id)
+        await message.answer("📌 تم إنشاء قائمة جديدة")
     else:
-        updated = await update_list_message(message.chat.id)
-        if updated:
-            await message.answer("✅ تم تحديث القائمة")
-        else:
-            await message.answer("⚠️ تعذر تحديث القائمة")
+        await message.answer("✅ تم تحديث القائمة")
 
 
 @dp.message(F.text.contains("تحديث القائمة"))
@@ -205,8 +209,14 @@ async def refresh_list(message: Message):
         await message.answer("📌 لم تكن هناك قائمة، فتم إنشاؤها")
         return
 
-    await update_list_message(message.chat.id)
-    await message.answer("🔄 تم تحديث القائمة")
+    updated = await update_list_message(message.chat.id)
+
+    if not updated:
+        data["list_message_id"] = None
+        await create_and_pin_list_message(message.chat.id)
+        await message.answer("📌 تعذر تحديث القديمة، فتم إنشاء قائمة جديدة")
+    else:
+        await message.answer("🔄 تم تحديث القائمة")
 
 
 @dp.message(F.text.contains("بدء حلقة جديدة"))
@@ -220,7 +230,10 @@ async def new_session(message: Message):
     data["is_open"] = False
 
     if data["list_message_id"]:
-        await update_list_message(message.chat.id)
+        updated = await update_list_message(message.chat.id)
+        if not updated:
+            data["list_message_id"] = None
+            await create_and_pin_list_message(message.chat.id)
     else:
         await create_and_pin_list_message(message.chat.id)
 
@@ -238,7 +251,10 @@ async def reset_list(message: Message):
     data["is_open"] = False
 
     if data["list_message_id"]:
-        await update_list_message(message.chat.id)
+        updated = await update_list_message(message.chat.id)
+        if not updated:
+            data["list_message_id"] = None
+            await create_and_pin_list_message(message.chat.id)
     else:
         await create_and_pin_list_message(message.chat.id)
 
@@ -263,7 +279,11 @@ async def handle_buttons(callback: CallbackQuery):
             return
 
         data["is_open"] = True
-        await update_list_message(chat_id)
+        updated = await update_list_message(chat_id)
+        if not updated:
+            data["list_message_id"] = None
+            await create_and_pin_list_message(chat_id)
+
         await callback.answer("✅ تم فتح القائمة")
 
     elif callback.data == "close_list":
@@ -272,7 +292,11 @@ async def handle_buttons(callback: CallbackQuery):
             return
 
         data["is_open"] = False
-        await update_list_message(chat_id)
+        updated = await update_list_message(chat_id)
+        if not updated:
+            data["list_message_id"] = None
+            await create_and_pin_list_message(chat_id)
+
         await callback.answer("🔒 تم غلق القائمة")
 
     elif callback.data == "register":
