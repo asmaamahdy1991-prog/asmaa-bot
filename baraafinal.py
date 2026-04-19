@@ -72,6 +72,7 @@ def get_admin_reply_keyboard() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text="📋 عرض القائمة")],
             [KeyboardButton(text="🔄 تحديث القائمة"), KeyboardButton(text="🆕 بدء حلقة جديدة")],
+            [KeyboardButton(text="📨 إرسال القائمة لآخر الدردشة")],
         ],
         resize_keyboard=True,
     )
@@ -190,7 +191,8 @@ async def start(message: Message):
         reply_markup=keyboard,
     )
 
-@dp.message(F.text.contains("عرض القائمة"))
+
+@dp.message(F.text == "📋 عرض القائمة")
 async def show_list(message: Message):
     if not await is_group_admin(message.chat.id, message.from_user.id):
         await message.answer("❌ هذا الزر للأدمن فقط")
@@ -200,7 +202,7 @@ async def show_list(message: Message):
     await message.answer("📌 تم إنشاء القائمة")
 
 
-@dp.message(F.text.contains("تحديث القائمة"))
+@dp.message(F.text == "🔄 تحديث القائمة")
 async def refresh_list(message: Message):
     if not await is_group_admin(message.chat.id, message.from_user.id):
         await message.answer("❌ هذا الزر للأدمن فقط")
@@ -210,7 +212,21 @@ async def refresh_list(message: Message):
     await message.answer("🔄 تم إنشاء قائمة محدثة")
 
 
-@dp.message(F.text.contains("بدء حلقة جديدة"))
+@dp.message(F.text == "📨 إرسال القائمة لآخر الدردشة")
+async def send_list_to_bottom(message: Message):
+    if not await is_group_admin(message.chat.id, message.from_user.id):
+        await message.answer("❌ هذا الزر للأدمن فقط")
+        return
+
+    await bot.send_message(
+        chat_id=message.chat.id,
+        text=build_list_text(message.chat.id),
+        reply_markup=get_inline_keyboard(),
+    )
+    await message.answer("✅ تم إرسال القائمة في آخر الدردشة")
+
+
+@dp.message(F.text == "🆕 بدء حلقة جديدة")
 async def new_session(message: Message):
     if not await is_group_admin(message.chat.id, message.from_user.id):
         await message.answer("❌ هذا الزر للأدمن فقط")
@@ -343,25 +359,7 @@ async def handle_buttons(callback: CallbackQuery):
 async def fallback_message(message: Message):
     await message.answer("✅ البوت يعمل، لكن هذه الرسالة غير مخصصة له")
 
-@dp.message(Command("start"))
-async def start(message: Message):
-    if not await is_group_admin(message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا البوت يعمل فقط بواسطة الأدمنز في الجروب")
-        return
 
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📋 عرض القائمة")],
-            [KeyboardButton(text="🔄 تحديث القائمة"), KeyboardButton(text="🆕 بدء حلقة جديدة")],
-            [KeyboardButton(text="📨 إرسال القائمة لآخر الدردشة")],
-        ],
-        resize_keyboard=True,
-    )
-
-    await message.answer(
-        "✅ تم تفعيل لوحة تحكم الأدمن",
-        reply_markup=keyboard,
-    )
 async def main():
     print("Bot is starting with polling...")
     await bot.delete_webhook(drop_pending_updates=True)
