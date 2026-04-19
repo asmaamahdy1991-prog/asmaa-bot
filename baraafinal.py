@@ -31,6 +31,7 @@ def get_group_data(chat_id: int):
         groups_data[chat_id] = {
             "is_open": False,
             "attendance": {},
+            "list_message_id": None,
         }
     return groups_data[chat_id]
 
@@ -101,37 +102,72 @@ def build_list_text(chat_id: int) -> str:
 """
     if teachers:
         for i, user in enumerate(teachers, 1):
-            name = user['name']
-            text += f"{i}- {name}\n"
+            text += f"{i}- {user['name']}\n"
     else:
         text += "لا يوجد\n"
 
     text += "\n📝 الطالبات:\n"
     if students:
         for i, user in enumerate(students, 1):
-            name = user['name']
-            text += f"{i}- {name}\n"
+            text += f"{i}- {user['name']}\n"
     else:
         text += "لا يوجد\n"
 
     text += "\n🎧 المستمعات:\n"
     if listeners:
         for i, user in enumerate(listeners, 1):
-            name = user['name']
-            text += f"{i}- {name}\n"
+            text += f"{i}- {user['name']}\n"
     else:
         text += "لا يوجد\n"
 
     return text
 
 
-async def send_list_message(chat_id: int):
-    """إرسال نسخة جديدة من القائمة في آخر الدردشة"""
-    await bot.send_message(
+async def create_and_pin_list_message(chat_id: int):
+    data = get_group_data(chat_id)
+
+    sent = await bot.send_message(
         chat_id=chat_id,
         text=build_list_text(chat_id),
         reply_markup=get_inline_keyboard(),
     )
+
+    data["list_message_id"] = sent.message_id
+
+    try:
+        await bot.pin_chat_message(chat_id, sent.message_id)
+    except Exception as e:
+        print("pin_chat_message error:", repr(e))
+
+
+async def update_list_message(chat_id: int):
+    data = get_group_data(chat_id)
+    message_id = data["list_message_id"]
+
+    if not message_id:
+        return False
+
+    try:
+        await bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=build_list_text(chat_id),
+            reply_markup=get_inline_keyboard(),
+        )
+        return True
+
+    except Exception as e:
+        error_text = str(e)
+
+        if "message is not modified" in error_text:
+            return True
+
+        if "message to edit not found" in error_text or "message can't be edited" in error_text:
+            data["list_message_id"] = None
+            return False
+
+        print("update_list_message error:", repr(e))
+        return False
 
 
 @dp.message(Command("start"))
@@ -140,11 +176,19 @@ async def start(message: Message):
         await message.answer("❌ هذا البوت يعمل فقط بواسطة الأدمنز في الجروب")
         return
 
-    await message.answer(
-        "✅ تم تفعيل لوحة تحكم الأدمن",
-        reply_markup=get_admin_reply_keyboard(),
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📋 عرض القائمة")],
+            [KeyboardButton(text="🔄 تحديث القائمة"), KeyboardButton(text="🆕 بدء حلقة جديدة")],
+            [KeyboardButton(text="📨 إرسال القائمة لآخر الدردشة")],
+        ],
+        resize_keyboard=True,
     )
 
+    await message.answer(
+        "✅ تم تفعيل لوحة تحكم الأدمن",
+        reply_markup=keyboard,
+    )
 
 @dp.message(F.text.contains("عرض القائمة"))
 async def show_list(message: Message):
@@ -152,8 +196,8 @@ async def show_list(message: Message):
         await message.answer("❌ هذا الزر للأدمن فقط")
         return
 
-    await send_list_message(message.chat.id)
-    await message.answer("📋 تم إرسال القائمة")
+    await create_and_pin_list_message(message.chat.id)
+    await message.answer("📌 تم إنشاء القائمة")
 
 
 @dp.message(F.text.contains("تحديث القائمة"))
@@ -162,8 +206,8 @@ async def refresh_list(message: Message):
         await message.answer("❌ هذا الزر للأدمن فقط")
         return
 
-    await send_list_message(message.chat.id)
-    await message.answer("🔄 تم إرسال قائمة محدثة")
+    await create_and_pin_list_message(message.chat.id)
+    await message.answer("🔄 تم إنشاء قائمة محدثة")
 
 
 @dp.message(F.text.contains("بدء حلقة جديدة"))
@@ -176,7 +220,7 @@ async def new_session(message: Message):
     data["attendance"].clear()
     data["is_open"] = False
 
-    await send_list_message(message.chat.id)
+    await create_and_pin_list_message(message.chat.id)
     await message.answer("🆕 تم بدء حلقة جديدة")
 
 
@@ -190,7 +234,7 @@ async def reset_list(message: Message):
     data["attendance"].clear()
     data["is_open"] = False
 
-    await send_list_message(message.chat.id)
+    await create_and_pin_list_message(message.chat.id)
     await message.answer("❌ تم مسح جميع الأسماء وإغلاق القائمة")
 
 
@@ -212,7 +256,11 @@ async def handle_buttons(callback: CallbackQuery):
             return
 
         data["is_open"] = True
-        await send_list_message(chat_id)
+        updated = await update_list_message(chat_id)
+        if not updated:
+            data["list_message_id"] = None
+            await create_and_pin_list_message(chat_id)
+
         await callback.answer("✅ تم فتح القائمة")
 
     elif callback.data == "close_list":
@@ -221,7 +269,11 @@ async def handle_buttons(callback: CallbackQuery):
             return
 
         data["is_open"] = False
-        await send_list_message(chat_id)
+        updated = await update_list_message(chat_id)
+        if not updated:
+            data["list_message_id"] = None
+            await create_and_pin_list_message(chat_id)
+
         await callback.answer("🔒 تم غلق القائمة")
 
     elif callback.data == "register":
@@ -233,7 +285,7 @@ async def handle_buttons(callback: CallbackQuery):
             "name": user_name,
             "type": "student",
         }
-        await send_list_message(chat_id)
+        await update_list_message(chat_id)
         await callback.answer("✅ تم تسجيلك")
 
     elif callback.data == "teacher":
@@ -245,7 +297,7 @@ async def handle_buttons(callback: CallbackQuery):
             "name": user_name,
             "type": "teacher",
         }
-        await send_list_message(chat_id)
+        await update_list_message(chat_id)
         await callback.answer("📚 تم تسجيلك كمعلمة")
 
     elif callback.data == "listener":
@@ -257,7 +309,7 @@ async def handle_buttons(callback: CallbackQuery):
             "name": user_name,
             "type": "listener",
         }
-        await send_list_message(chat_id)
+        await update_list_message(chat_id)
         await callback.answer("🎧 تم تسجيلك كمستمعة")
 
     elif callback.data == "read":
@@ -272,13 +324,13 @@ async def handle_buttons(callback: CallbackQuery):
         if not data["attendance"][user_id]["name"].endswith(" ✅"):
             data["attendance"][user_id]["name"] += " ✅"
 
-        await send_list_message(chat_id)
+        await update_list_message(chat_id)
         await callback.answer("✅ تم وضع علامة قرأت")
 
     elif callback.data == "delete_name":
         if user_id in data["attendance"]:
             del data["attendance"][user_id]
-            await send_list_message(chat_id)
+            await update_list_message(chat_id)
             await callback.answer("❌ تم حذف اسمك")
         else:
             await callback.answer("الاسم غير موجود", show_alert=True)
