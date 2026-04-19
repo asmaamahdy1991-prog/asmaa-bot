@@ -188,21 +188,8 @@ async def show_list(message: Message):
         await message.answer("❌ هذا الزر للأدمن فقط")
         return
 
-    data = get_group_data(message.chat.id)
-
-    if not data["list_message_id"]:
-        await create_and_pin_list_message(message.chat.id)
-        await message.answer("📌 تم إنشاء القائمة")
-        return
-
-    updated = await update_list_message(message.chat.id)
-
-    if not updated:
-        data["list_message_id"] = None
-        await create_and_pin_list_message(message.chat.id)
-        await message.answer("📌 تم إنشاء قائمة جديدة")
-    else:
-        await message.answer("✅ تم تحديث القائمة")
+    await create_and_pin_list_message(message.chat.id)
+    await message.answer("📌 تم إنشاء القائمة")
 
 
 @dp.message(F.text.contains("تحديث القائمة"))
@@ -211,21 +198,8 @@ async def refresh_list(message: Message):
         await message.answer("❌ هذا الزر للأدمن فقط")
         return
 
-    data = get_group_data(message.chat.id)
-
-    if not data["list_message_id"]:
-        await create_and_pin_list_message(message.chat.id)
-        await message.answer("📌 لم تكن هناك قائمة، فتم إنشاؤها")
-        return
-
-    updated = await update_list_message(message.chat.id)
-
-    if not updated:
-        data["list_message_id"] = None
-        await create_and_pin_list_message(message.chat.id)
-        await message.answer("📌 تعذر تحديث القديمة، فتم إنشاء قائمة جديدة")
-    else:
-        await message.answer("🔄 تم تحديث القائمة")
+    await create_and_pin_list_message(message.chat.id)
+    await message.answer("🔄 تم إنشاء قائمة محدثة")
 
 
 @dp.message(F.text.contains("بدء حلقة جديدة"))
@@ -238,14 +212,7 @@ async def new_session(message: Message):
     data["attendance"].clear()
     data["is_open"] = False
 
-    if data["list_message_id"]:
-        updated = await update_list_message(message.chat.id)
-        if not updated:
-            data["list_message_id"] = None
-            await create_and_pin_list_message(message.chat.id)
-    else:
-        await create_and_pin_list_message(message.chat.id)
-
+    await create_and_pin_list_message(message.chat.id)
     await message.answer("🆕 تم بدء حلقة جديدة")
 
 
@@ -259,14 +226,7 @@ async def reset_list(message: Message):
     data["attendance"].clear()
     data["is_open"] = False
 
-    if data["list_message_id"]:
-        updated = await update_list_message(message.chat.id)
-        if not updated:
-            data["list_message_id"] = None
-            await create_and_pin_list_message(message.chat.id)
-    else:
-        await create_and_pin_list_message(message.chat.id)
-
+    await create_and_pin_list_message(message.chat.id)
     await message.answer("❌ تم مسح جميع الأسماء وإغلاق القائمة")
 
 
@@ -369,9 +329,12 @@ async def handle_buttons(callback: CallbackQuery):
 
     else:
         await callback.answer()
+
+
 @dp.message()
 async def fallback_message(message: Message):
     await message.answer("✅ البوت يعمل، لكن هذه الرسالة غير مخصصة له")
+
 
 async def main():
     print("Bot is starting with polling...")
