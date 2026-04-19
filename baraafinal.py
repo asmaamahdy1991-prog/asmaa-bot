@@ -343,7 +343,25 @@ async def handle_buttons(callback: CallbackQuery):
 async def fallback_message(message: Message):
     await message.answer("✅ البوت يعمل، لكن هذه الرسالة غير مخصصة له")
 
+@dp.message(Command("start"))
+async def start(message: Message):
+    if not await is_group_admin(message.chat.id, message.from_user.id):
+        await message.answer("❌ هذا البوت يعمل فقط بواسطة الأدمنز في الجروب")
+        return
 
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📋 عرض القائمة")],
+            [KeyboardButton(text="🔄 تحديث القائمة"), KeyboardButton(text="🆕 بدء حلقة جديدة")],
+            [KeyboardButton(text="📨 إرسال القائمة لآخر الدردشة")],
+        ],
+        resize_keyboard=True,
+    )
+
+    await message.answer(
+        "✅ تم تفعيل لوحة تحكم الأدمن",
+        reply_markup=keyboard,
+    )
 async def main():
     print("Bot is starting with polling...")
     await bot.delete_webhook(drop_pending_updates=True)
