@@ -171,6 +171,8 @@ async def update_list_message(chat_id: int):
         return False
 
 
+from aiogram.types import ReplyKeyboardRemove
+
 @dp.message(Command("start"))
 async def start(message: Message):
     if not await is_group_admin(message.chat.id, message.from_user.id):
@@ -186,6 +188,14 @@ async def start(message: Message):
         resize_keyboard=True,
     )
 
+    # إزالة الكيبورد القديمة أولًا
+    await message.answer("♻️ جاري تحديث لوحة الأدمن...", reply_markup=ReplyKeyboardRemove())
+
+    # إرسال اللوحة الجديدة
+    await message.answer(
+        "✅ تم تفعيل لوحة تحكم الأدمن",
+        reply_markup=keyboard,
+    )
     await message.answer(
         "✅ تم تفعيل لوحة تحكم الأدمن",
         reply_markup=keyboard,
