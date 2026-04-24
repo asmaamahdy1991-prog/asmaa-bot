@@ -369,12 +369,6 @@ async def handle_buttons(callback: CallbackQuery):
 async def fallback_message(message: Message):
     await message.answer("✅ البوت يعمل، لكن هذه الرسالة غير مخصصة له")
 
-@dp.message(Command("sendlist"))
-async def send_list_command(message: Message):
-    if not await is_group_admin(message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا الأمر للأدمن فقط")
-        return
-
     await bot.send_message(
         chat_id=message.chat.id,
         text=build_list_text(message.chat.id),
