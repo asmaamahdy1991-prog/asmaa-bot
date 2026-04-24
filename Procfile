@@ -1,1 +1,1 @@
-web: python baraafinal.py
+web: python main.py
