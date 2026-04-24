@@ -42,12 +42,11 @@ async def is_group_admin(chat_id: int, user_id: int) -> bool:
     try:
         member = await bot.get_chat_member(chat_id, user_id)
         return member.status in ["administrator", "creator"]
-    except Exception as e:
-        print("is_group_admin error:", repr(e))
+    except:
         return False
 
 
-def get_inline_keyboard() -> InlineKeyboardMarkup:
+def get_inline_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -72,370 +71,220 @@ def get_inline_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def get_admin_reply_keyboard() -> ReplyKeyboardMarkup:
+def get_admin_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📋 عرض القائمة")],
-            [
-                KeyboardButton(text="🔄 تحديث القائمة"),
-                KeyboardButton(text="🆕 بدء حلقة جديدة"),
-            ],
+            [KeyboardButton(text="🔄 تحديث القائمة"), KeyboardButton(text="🆕 بدء حلقة جديدة")],
             [KeyboardButton(text="📤 إرسال القائمة")],
         ],
         resize_keyboard=True,
     )
 
 
-def build_list_text(chat_id: int) -> str:
+def build_list_text(chat_id: int):
     data = get_group_data(chat_id)
-    attendance = data["attendance"]
-    is_open = data["is_open"]
 
-    status = "🟢 مفتوحة" if is_open else "🔴 مغلقة"
+    status = "🟢 مفتوحة" if data["is_open"] else "🔴 مغلقة"
 
-    teachers = []
-    students = []
-    listeners = []
+    teachers, students, listeners = [], [], []
 
-    for user in attendance.values():
+    for user in data["attendance"].values():
         if user["type"] == "teacher":
-            teachers.append(user)
+            teachers.append(user["name"])
         elif user["type"] == "listener":
-            listeners.append(user)
+            listeners.append(user["name"])
         else:
-            students.append(user)
+            students.append(user["name"])
 
-    text = f"""📌 حالة القائمة: {status}
+    text = f"📌 حالة القائمة: {status}\n\n📚 المعلمات:\n"
+    text += "\n".join([f"{i+1}- {n}" for i, n in enumerate(teachers)]) or "لا يوجد"
 
-📚 المعلمات:
-"""
+    text += "\n\n📝 الطالبات:\n"
+    text += "\n".join([f"{i+1}- {n}" for i, n in enumerate(students)]) or "لا يوجد"
 
-    if teachers:
-        for i, user in enumerate(teachers, 1):
-            text += f"{i}- {user['name']}\n"
-    else:
-        text += "لا يوجد\n"
-
-    text += "\n📝 الطالبات:\n"
-
-    if students:
-        for i, user in enumerate(students, 1):
-            text += f"{i}- {user['name']}\n"
-    else:
-        text += "لا يوجد\n"
-
-    text += "\n🎧 المستمعات:\n"
-
-    if listeners:
-        for i, user in enumerate(listeners, 1):
-            text += f"{i}- {user['name']}\n"
-    else:
-        text += "لا يوجد\n"
+    text += "\n\n🎧 المستمعات:\n"
+    text += "\n".join([f"{i+1}- {n}" for i, n in enumerate(listeners)]) or "لا يوجد"
 
     return text
 
 
-async def create_and_pin_list_message(chat_id: int):
+async def create_and_pin_list(chat_id):
     data = get_group_data(chat_id)
 
-    sent = await bot.send_message(
-        chat_id=chat_id,
-        text=build_list_text(chat_id),
-        reply_markup=get_inline_keyboard(),
-    )
-
-    data["list_message_id"] = sent.message_id
+    msg = await bot.send_message(chat_id, build_list_text(chat_id), reply_markup=get_inline_keyboard())
+    data["list_message_id"] = msg.message_id
 
     try:
-        await bot.pin_chat_message(
-            chat_id=chat_id,
-            message_id=sent.message_id,
-            disable_notification=True,
-        )
-    except Exception as e:
-        print("pin_chat_message error:", repr(e))
+        await bot.pin_chat_message(chat_id, msg.message_id, disable_notification=True)
+    except:
+        pass
 
 
-async def send_new_bottom_message(chat_id: int):
+async def send_new_bottom(chat_id):
     data = get_group_data(chat_id)
 
-    sent = await bot.send_message(
-        chat_id=chat_id,
-        text=build_list_text(chat_id),
-        reply_markup=get_inline_keyboard(),
-    )
-
-    data["bottom_message_id"] = sent.message_id
+    msg = await bot.send_message(chat_id, build_list_text(chat_id), reply_markup=get_inline_keyboard())
+    data["bottom_message_id"] = msg.message_id
 
 
-async def update_list_message(chat_id: int):
+async def update_pinned(chat_id):
     data = get_group_data(chat_id)
-    message_id = data["list_message_id"]
 
-    if not message_id:
+    if not data["list_message_id"]:
         return False
 
     try:
         await bot.edit_message_text(
             chat_id=chat_id,
-            message_id=message_id,
+            message_id=data["list_message_id"],
             text=build_list_text(chat_id),
             reply_markup=get_inline_keyboard(),
         )
         return True
-
-    except Exception as e:
-        error_text = str(e).lower()
-
-        if "message is not modified" in error_text:
-            return True
-
-        if "message to edit not found" in error_text or "message can't be edited" in error_text:
-            data["list_message_id"] = None
-            return False
-
-        print("update_list_message error:", repr(e))
+    except:
+        data["list_message_id"] = None
         return False
 
 
-async def update_bottom_message(chat_id: int):
+async def update_bottom(chat_id):
     data = get_group_data(chat_id)
-    message_id = data["bottom_message_id"]
 
-    if not message_id:
-        return False
+    if not data["bottom_message_id"]:
+        return
 
     try:
         await bot.edit_message_text(
             chat_id=chat_id,
-            message_id=message_id,
+            message_id=data["bottom_message_id"],
             text=build_list_text(chat_id),
             reply_markup=get_inline_keyboard(),
         )
-        return True
-
-    except Exception as e:
-        error_text = str(e).lower()
-
-        if "message is not modified" in error_text:
-            return True
-
-        if "message to edit not found" in error_text or "message can't be edited" in error_text:
-            data["bottom_message_id"] = None
-            return False
-
-        print("update_bottom_message error:", repr(e))
+    except:
         data["bottom_message_id"] = None
-        return False
 
 
-async def update_or_create_list(chat_id: int):
-    updated = await update_list_message(chat_id)
+async def update_all(chat_id):
+    if not await update_pinned(chat_id):
+        await create_and_pin_list(chat_id)
 
-    if not updated:
-        await create_and_pin_list_message(chat_id)
+    await update_bottom(chat_id)
 
-    await update_bottom_message(chat_id)
 
+# ================= ADMIN =================
 
 @dp.message(Command("start"))
 async def start(message: Message):
     if not await is_group_admin(message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا البوت يعمل فقط بواسطة الأدمنز في الجروب")
-        return
+        return await message.answer("❌ للأدمن فقط")
 
-    await message.answer(
-        "♻️ جاري تحديث لوحة الأدمن...",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-
-    await message.answer(
-        "✅ تم تفعيل لوحة تحكم الأدمن",
-        reply_markup=get_admin_reply_keyboard(),
-    )
-
-
-@dp.message(Command("sendlist"))
-async def send_list_command(message: Message):
-    if not await is_group_admin(message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا الأمر للأدمن فقط")
-        return
-
-    await send_new_bottom_message(message.chat.id)
-    await message.answer("✅ تم إرسال القائمة في آخر الدردشة")
-
-
-@dp.message(Command("reset"))
-async def reset_list(message: Message):
-    if not await is_group_admin(message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا الأمر للأدمن فقط")
-        return
-
-    data = get_group_data(message.chat.id)
-    data["attendance"].clear()
-    data["is_open"] = False
-    data["bottom_message_id"] = None
-
-    await update_or_create_list(message.chat.id)
-    await message.answer("❌ تم مسح جميع الأسماء وإغلاق القائمة")
+    await message.answer("♻️ تحديث...", reply_markup=ReplyKeyboardRemove())
+    await message.answer("✅ تم التفعيل", reply_markup=get_admin_keyboard())
 
 
 @dp.message(F.text == "📋 عرض القائمة")
 async def show_list(message: Message):
     if not await is_group_admin(message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا الزر للأدمن فقط")
         return
 
-    await create_and_pin_list_message(message.chat.id)
-    await message.answer("📌 تم إنشاء القائمة")
+    await update_all(message.chat.id)
+    await send_new_bottom(message.chat.id)
+
+    await message.answer("📋 تم إرسال القائمة في آخر الدردشة")
 
 
 @dp.message(F.text == "🔄 تحديث القائمة")
-async def refresh_list(message: Message):
+async def refresh(message: Message):
     if not await is_group_admin(message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا الزر للأدمن فقط")
         return
 
-    await update_or_create_list(message.chat.id)
-    await message.answer("🔄 تم تحديث القائمة")
+    await update_all(message.chat.id)
+    await send_new_bottom(message.chat.id)
+
+    await message.answer("🔄 تم التحديث")
 
 
 @dp.message(F.text == "📤 إرسال القائمة")
-async def send_list_to_bottom(message: Message):
+async def send_bottom_btn(message: Message):
     if not await is_group_admin(message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا الزر للأدمن فقط")
         return
 
-    await send_new_bottom_message(message.chat.id)
-    await message.answer("✅ تم إرسال القائمة في آخر الدردشة")
+    await send_new_bottom(message.chat.id)
+    await message.answer("✅ تم الإرسال")
 
 
 @dp.message(F.text == "🆕 بدء حلقة جديدة")
 async def new_session(message: Message):
-    if not await is_group_admin(message.chat.id, message.from_user.id):
-        await message.answer("❌ هذا الزر للأدمن فقط")
-        return
-
     data = get_group_data(message.chat.id)
     data["attendance"].clear()
     data["is_open"] = False
-    data["bottom_message_id"] = None
 
-    await update_or_create_list(message.chat.id)
+    await update_all(message.chat.id)
     await message.answer("🆕 تم بدء حلقة جديدة")
 
 
-@dp.callback_query()
-async def handle_buttons(callback: CallbackQuery):
-    if not callback.message:
-        await callback.answer("حدث خطأ داخلي", show_alert=True)
-        return
+# ================= BUTTONS =================
 
-    chat_id = callback.message.chat.id
-    user_id = callback.from_user.id
-    user_name = callback.from_user.full_name
+@dp.callback_query()
+async def buttons(c: CallbackQuery):
+    chat_id = c.message.chat.id
+    user_id = c.from_user.id
+    name = c.from_user.full_name
 
     data = get_group_data(chat_id)
 
-    if callback.data == "open_list":
+    if c.data == "open_list":
         if not await is_group_admin(chat_id, user_id):
-            await callback.answer("❌ هذا الزر للأدمن فقط", show_alert=True)
-            return
+            return await c.answer("❌ للأدمن فقط", show_alert=True)
 
         data["is_open"] = True
-        await update_or_create_list(chat_id)
-        await callback.answer("✅ تم فتح القائمة")
+        await update_all(chat_id)
 
-    elif callback.data == "close_list":
+    elif c.data == "close_list":
         if not await is_group_admin(chat_id, user_id):
-            await callback.answer("❌ هذا الزر للأدمن فقط", show_alert=True)
-            return
+            return await c.answer("❌ للأدمن فقط", show_alert=True)
 
         data["is_open"] = False
-        await update_or_create_list(chat_id)
-        await callback.answer("🔒 تم غلق القائمة")
+        await update_all(chat_id)
 
-    elif callback.data == "send_bottom":
+    elif c.data == "send_bottom":
         if not await is_group_admin(chat_id, user_id):
-            await callback.answer("❌ هذا الزر للأدمن فقط", show_alert=True)
-            return
+            return await c.answer("❌ للأدمن فقط", show_alert=True)
 
-        await send_new_bottom_message(chat_id)
-        await callback.answer("✅ تم إرسال القائمة في آخر الدردشة")
+        await send_new_bottom(chat_id)
 
-    elif callback.data == "register":
+    elif c.data == "register":
         if not data["is_open"]:
-            await callback.answer("❌ القائمة مغلقة", show_alert=True)
-            return
+            return await c.answer("❌ مغلقة", True)
 
-        data["attendance"][user_id] = {
-            "name": user_name,
-            "type": "student",
-        }
+        data["attendance"][user_id] = {"name": name, "type": "student"}
 
-        await update_or_create_list(chat_id)
-        await callback.answer("✅ تم تسجيلك")
-
-    elif callback.data == "teacher":
+    elif c.data == "teacher":
         if not data["is_open"]:
-            await callback.answer("❌ القائمة مغلقة", show_alert=True)
-            return
+            return await c.answer("❌ مغلقة", True)
 
-        data["attendance"][user_id] = {
-            "name": user_name,
-            "type": "teacher",
-        }
+        data["attendance"][user_id] = {"name": name, "type": "teacher"}
 
-        await update_or_create_list(chat_id)
-        await callback.answer("📚 تم تسجيلك كمعلمة")
-
-    elif callback.data == "listener":
+    elif c.data == "listener":
         if not data["is_open"]:
-            await callback.answer("❌ القائمة مغلقة", show_alert=True)
-            return
+            return await c.answer("❌ مغلقة", True)
 
-        data["attendance"][user_id] = {
-            "name": user_name,
-            "type": "listener",
-        }
+        data["attendance"][user_id] = {"name": name, "type": "listener"}
 
-        await update_or_create_list(chat_id)
-        await callback.answer("🎧 تم تسجيلك كمستمعة")
-
-    elif callback.data == "read":
-        if not data["is_open"]:
-            await callback.answer("❌ القائمة مغلقة", show_alert=True)
-            return
-
-        if user_id not in data["attendance"]:
-            await callback.answer("❌ سجلي اسمك أولًا", show_alert=True)
-            return
-
-        if not data["attendance"][user_id]["name"].endswith(" ✅"):
+    elif c.data == "read":
+        if user_id in data["attendance"]:
             data["attendance"][user_id]["name"] += " ✅"
 
-        await update_or_create_list(chat_id)
-        await callback.answer("✅ تم وضع علامة قرأت")
+    elif c.data == "delete_name":
+        data["attendance"].pop(user_id, None)
 
-    elif callback.data == "delete_name":
-        if user_id in data["attendance"]:
-            del data["attendance"][user_id]
-            await update_or_create_list(chat_id)
-            await callback.answer("❌ تم حذف اسمك")
-        else:
-            await callback.answer("الاسم غير موجود", show_alert=True)
-
-    else:
-        await callback.answer()
+    await update_all(chat_id)
+    await c.answer("تم")
 
 
-@dp.message()
-async def fallback_message(message: Message):
-    await message.answer("✅ البوت يعمل، لكن هذه الرسالة غير مخصصة له")
-
+# ================= RUN =================
 
 async def main():
-    print("Bot is starting with polling...")
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
