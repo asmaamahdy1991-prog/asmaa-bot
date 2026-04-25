@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os
+from datetime import datetime
+from html import escape
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
@@ -36,6 +38,39 @@ def get_group_data(chat_id: int):
             "bottom_message_id": None,
         }
     return groups_data[chat_id]
+
+
+def get_arabic_date():
+    days = {
+        "Saturday": "السبت",
+        "Sunday": "الأحد",
+        "Monday": "الإثنين",
+        "Tuesday": "الثلاثاء",
+        "Wednesday": "الأربعاء",
+        "Thursday": "الخميس",
+        "Friday": "الجمعة",
+    }
+
+    months = {
+        "January": "يناير",
+        "February": "فبراير",
+        "March": "مارس",
+        "April": "أبريل",
+        "May": "مايو",
+        "June": "يونيو",
+        "July": "يوليو",
+        "August": "أغسطس",
+        "September": "سبتمبر",
+        "October": "أكتوبر",
+        "November": "نوفمبر",
+        "December": "ديسمبر",
+    }
+
+    now = datetime.now()
+    day_name = days[now.strftime("%A")]
+    month_name = months[now.strftime("%B")]
+
+    return f"{day_name} - {now.day} {month_name} {now.year}", now.strftime("%H:%M")
 
 
 async def is_group_admin(chat_id: int, user_id: int) -> bool:
@@ -86,61 +121,72 @@ def get_admin_keyboard():
     )
 
 
+def make_user_link(user_id: int, name: str):
+    safe_name = escape(name)
+    return f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+
+
 def build_list_text(chat_id: int):
     data = get_group_data(chat_id)
 
     status = "🟢 مفتوحة" if data["is_open"] else "🔴 مغلقة"
+    date_str, time_str = get_arabic_date()
 
     teachers = []
     students = []
     listeners = []
 
-    for user in data["attendance"].values():
-        name = user["name"]
+    for user_id, user in data["attendance"].items():
+        name = make_user_link(user["id"], user["name"])
 
         if user.get("read", False):
             name += " ✅"
 
         if user["type"] == "teacher":
-            teachers.append(name)
+            teachers.append(f"👑 <b>{name}</b>")
         elif user["type"] == "listener":
             listeners.append(name)
         else:
             students.append(name)
-text = f"""🌧━━━━━━━━━━━━━━━━━━🌧
-⤸ بِسْـــمِ اللَّـهِ الرَّحمَـٰنِ الرَّحيـٰــم ⤹
-🌧━━━━━━━━━━━━━━━━━━🌧
 
-🌙 ﴿ وَالَّذِينَ جَاهَدُوا فِينَا لَنَهْدِيَنَّهُمْ سُبُلَنَا ﴾  
-📖 [العنكبوت: 69]
+    total = len(data["attendance"])
 
-🔰 قال رسول الله ﷺ:
-"الَّذِي يَقْرَأُ القُرْآنَ وَهُوَ ماهِرٌ بِهِ معَ السَّفَرةِ الكِرَامِ،
-وَالَّذِي يقرَأُ القُرْآنَ ويَتَتَعْتَعُ فِيهِ وَهُو عليهِ شَاقٌّ لَهُ أَجْران"
-📚 رواه مسلم
+    text = f"""📅 {date_str}
+⏱ {time_str}
 
-❤️ نبدأ الحلقة بعون الله تعالى ❤️
+🌧⤸ بِسْـــمِ اللَّـهِ الرَّحمَـٰنِ الرَّحيـٰــم ⤹🌧
 
-📌 غاليتي:
-لحجز دورك اضغطي ضغطة واحدة على الخيار المناسب لكِ 👇
+🌙وَالَّذِينَ جَاهَدُوا فِينَا لَنَهْدِيَنَّهُمْ سُبُلَنَا وَإِنَّ اللَّهَ لَمَعَ الْمُحْسِنِينَ [العنكبوت:69].
 
-🌙━━━━━━━━━━━━━━━━━━🌙
-📖 قائمة السفرة الكرام البررة 📖
-🌙━━━━━━━━━━━━━━━━━━🌙
+🔰عن عائشة رضي اللَّه عنها قالَتْ: قالَ رسولُ اللَّهِ ﷺ:
+الَّذِي يَقْرَأُ القُرْآنَ وَهُو ماهِرٌ بِهِ معَ السَّفَرةِ الكِرَامِ البَرَرَةِ،
+وَالَّذِي يقرَأُ القُرْآنَ ويَتَتَعْتَعُ فِيهِ وَهُو عليهِ شَاقٌّ لَهُ أَجْران
+رواه مسلم.
+
+❤️نبدأ الحلقة بعون الله تعالي❤️
+
+غاليتي لحجز دورك اضغطي ضغطة واحدة على الخيار المناسب لكِ على الأزرار أسفل القائمة مباشرة 👇👇👇
+
+    🌙🌧قائمة السفرة الكرام البررة 🌙
 
 📌 حالة القائمة: {status}
+🔢 عدد المسجلات: {total}
 
+📚 المعلمات:
 """
-   
-
-    text += "📚 المعلمات:\n"
-    text += "\n".join([f"{i + 1}- {name}" for i, name in enumerate(teachers)]) or "لا يوجد"
+    text += "\n".join([f"{i + 1}- {n}" for i, n in enumerate(teachers)]) or "لا يوجد"
 
     text += "\n\n📝 الطالبات:\n"
-    text += "\n".join([f"{i + 1}- {name}" for i, name in enumerate(students)]) or "لا يوجد"
+    text += "\n".join([f"{i + 1}- {n}" for i, n in enumerate(students)]) or "لا يوجد"
 
     text += "\n\n🎧 المستمعات:\n"
-    text += "\n".join([f"{i + 1}- {name}" for i, name in enumerate(listeners)]) or "لا يوجد"
+    text += "\n".join([f"{i + 1}- {n}" for i, n in enumerate(listeners)]) or "لا يوجد"
+
+    text += """
+---------------------------------•
+♡اللهم لا تدع لنا ذنبًا إلا غفرته ولا مريضًا إلا شفيته ولا همًّا إلا فرجته، اللهم اجعل الحياة زيادة لنا من كل خير والموت راحة لنا من كل شر، اللهم اجعل القرآن العظيم ربيع قلوبنا ونور صدورنا وجلاء همومنا وأحزاننا، اللهم آمين 🌙🌧
+(اللهم ارحم أبي وجميع موتى المسلمين)
+"""
 
     return text
 
@@ -152,6 +198,7 @@ async def create_and_pin_list(chat_id: int):
         chat_id=chat_id,
         text=build_list_text(chat_id),
         reply_markup=get_inline_keyboard(),
+        parse_mode="HTML",
     )
 
     data["list_message_id"] = msg.message_id
@@ -173,6 +220,7 @@ async def send_new_bottom(chat_id: int):
         chat_id=chat_id,
         text=build_list_text(chat_id),
         reply_markup=get_inline_keyboard(),
+        parse_mode="HTML",
     )
 
     data["bottom_message_id"] = msg.message_id
@@ -190,6 +238,7 @@ async def update_pinned(chat_id: int):
             message_id=data["list_message_id"],
             text=build_list_text(chat_id),
             reply_markup=get_inline_keyboard(),
+            parse_mode="HTML",
         )
         return True
     except Exception as e:
@@ -215,6 +264,7 @@ async def update_bottom(chat_id: int):
             message_id=data["bottom_message_id"],
             text=build_list_text(chat_id),
             reply_markup=get_inline_keyboard(),
+            parse_mode="HTML",
         )
         return True
     except Exception as e:
@@ -375,6 +425,7 @@ async def buttons(c: CallbackQuery):
             return
 
         data["attendance"][user_id] = {
+            "id": user_id,
             "name": name,
             "type": "student",
             "read": False,
@@ -394,6 +445,7 @@ async def buttons(c: CallbackQuery):
             return
 
         data["attendance"][user_id] = {
+            "id": user_id,
             "name": name,
             "type": "teacher",
             "read": False,
@@ -413,6 +465,7 @@ async def buttons(c: CallbackQuery):
             return
 
         data["attendance"][user_id] = {
+            "id": user_id,
             "name": name,
             "type": "listener",
             "read": False,
@@ -451,6 +504,8 @@ async def buttons(c: CallbackQuery):
         return
 
     await c.answer()
+
+
 
 
 
