@@ -482,17 +482,6 @@ async def buttons(c: CallbackQuery):
     await c.answer()
 
 
-async def main():
-    print("Bot is starting with polling...")
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
-
-@dp.callback_query()
-async def buttons(c: CallbackQuery):
-    # كل كود الأزرار كما هو عندك
-    ...
-
-
 @dp.message()
 async def ignore_unknown_messages(message: Message):
     pass
