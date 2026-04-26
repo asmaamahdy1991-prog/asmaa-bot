@@ -286,12 +286,14 @@ async def update_bottom(chat_id: int):
 
 
 async def update_all(chat_id: int):
+    # تحديث الرسالة المثبتة
     updated = await update_pinned(chat_id)
 
     if not updated:
         await create_and_pin_list(chat_id)
 
-    await update_bottom(chat_id)
+    # إرسال نسخة جديدة دائمًا في آخر الدردشة
+    await send_new_bottom(chat_id)
 
 
 @dp.message(Command("start"))
