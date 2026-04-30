@@ -295,7 +295,7 @@ async def new_list_text(message: Message):
     data["list_message_id"] = None
     data["bottom_message_id"] = None
 
-    await create_and_pin_list(message.chat.id)
+    # ترسل قائمة واحدة فقط في آخر الدردشة
     await send_new_bottom(message.chat.id)
 
 
