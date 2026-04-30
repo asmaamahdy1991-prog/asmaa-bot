@@ -284,7 +284,7 @@ async def continue_list(message: Message):
     await send_new_bottom(message.chat.id)
 
 
-@dp.message(F.text == "بدء قايمة جديده")
+@dp.message(F.text.in_({"بدء قايمة جديده", "بدء قائمة جديده"}))
 async def new_list_text(message: Message):
     if not await is_group_admin(message.chat.id, message.from_user.id):
         return
