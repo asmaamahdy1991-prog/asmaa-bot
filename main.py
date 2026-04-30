@@ -249,7 +249,17 @@ async def reset_list(message: Message):
 
     await update_all(message.chat.id)
 
+@dp.message(F.text == "بدء قايمة جديده")
+async def new_list_by_text(message: Message):
+    if not await is_group_admin(message.chat.id, message.from_user.id):
+        return
 
+    data = get_group_data(message.chat.id)
+    data["attendance"].clear()
+    data["is_open"] = False
+    data["bottom_message_id"] = None
+
+    await send_new_bottom(message.chat.id)
 @dp.callback_query()
 async def buttons(c: CallbackQuery):
     if not c.message:
