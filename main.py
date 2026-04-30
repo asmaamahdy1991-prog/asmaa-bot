@@ -190,7 +190,7 @@ def build_list_text(chat_id: int):
     return text
 
 
-async def create_and_pin_list(chat_id: int):
+async def send_active_list(chat_id: int):
     data = get_group_data(chat_id)
 
     msg = await bot.send_message(
@@ -201,20 +201,10 @@ async def create_and_pin_list(chat_id: int):
     )
 
     data["list_message_id"] = msg.message_id
-
-    try:
-        await bot.pin_chat_message(
-            chat_id=chat_id,
-            message_id=msg.message_id,
-            disable_notification=True,
-        )
-    except:
-        pass
+    data["bottom_message_id"] = msg.message_id
 
 
-async def send_new_bottom(chat_id: int):
-    data = get_group_data(chat_id)
-
+async def send_copy_bottom(chat_id: int):
     msg = await bot.send_message(
         chat_id=chat_id,
         text=build_list_text(chat_id),
@@ -222,7 +212,7 @@ async def send_new_bottom(chat_id: int):
         parse_mode="HTML",
     )
 
-    data["bottom_message_id"] = msg.message_id
+    get_group_data(chat_id)["bottom_message_id"] = msg.message_id
 
 
 async def update_pinned(chat_id: int):
@@ -246,7 +236,7 @@ async def update_pinned(chat_id: int):
         if "message is not modified" in error_text:
             return True
 
-        print("update_pinned error:", repr(e))
+        print("update error:", repr(e))
         return False
 
 
@@ -273,7 +263,7 @@ async def start(message: Message):
     data["list_message_id"] = None
     data["bottom_message_id"] = None
 
-    await create_and_pin_list(message.chat.id)
+    await send_active_list(message.chat.id)
 
 
 @dp.message(F.text == "كمل")
@@ -281,7 +271,7 @@ async def continue_list(message: Message):
     if not await is_group_admin(message.chat.id, message.from_user.id):
         return
 
-    await send_new_bottom(message.chat.id)
+    await send_copy_bottom(message.chat.id)
 
 
 @dp.message(F.text.in_({"بدء قايمة جديده", "بدء قائمة جديده"}))
@@ -291,12 +281,11 @@ async def new_list_text(message: Message):
 
     data = get_group_data(message.chat.id)
     data["attendance"].clear()
-    data["is_open"] = False
+    data["is_open"] = True
     data["list_message_id"] = None
     data["bottom_message_id"] = None
 
-    # ترسل قائمة واحدة فقط في آخر الدردشة
-    await send_new_bottom(message.chat.id)
+    await send_active_list(message.chat.id)
 
 
 @dp.callback_query()
@@ -371,8 +360,8 @@ async def buttons(c: CallbackQuery):
     elif c.data == "delete_name":
         data["attendance"].pop(user_id, None)
 
-    await update_all(chat_id)
     await c.answer("تم")
+    asyncio.create_task(update_all(chat_id))
 
 
 @dp.message()
