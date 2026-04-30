@@ -300,6 +300,10 @@ async def buttons(c: CallbackQuery):
 
     data = get_group_data(chat_id)
 
+    if c.message.message_id != data.get("list_message_id"):
+        await c.answer("❌ هذه قائمة قديمة، استخدمي آخر قائمة", show_alert=True)
+        return
+
     if c.data == "open_list":
         if not await is_group_admin(chat_id, user_id):
             return await c.answer("❌ للأدمن فقط", show_alert=True)
