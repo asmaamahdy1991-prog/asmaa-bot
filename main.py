@@ -100,6 +100,11 @@ async def is_group_admin(chat_id: int, user_id: int) -> bool:
         return False
 
 
+def make_user_link(user_id: int, name: str):
+    safe_name = escape(name)
+    return f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+
+
 def get_inline_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -118,16 +123,8 @@ def get_inline_keyboard():
                 InlineKeyboardButton(text="🔓 فتح القائمة", callback_data="open_list"),
                 InlineKeyboardButton(text="🔒 غلق القائمة", callback_data="close_list"),
             ],
-            [
-                InlineKeyboardButton(text="📤 إرسال لآخر الدردشة", callback_data="send_bottom"),
-            ],
         ]
     )
-
-
-def make_user_link(user_id: int, name: str):
-    safe_name = escape(name)
-    return f'<a href="tg://user?id={user_id}">{safe_name}</a>'
 
 
 def build_list_text(chat_id: int):
@@ -196,6 +193,11 @@ def build_list_text(chat_id: int):
 async def create_and_pin_list(chat_id: int):
     data = get_group_data(chat_id)
 
+    if data["list_message_id"]:
+        updated = await update_pinned(chat_id)
+        if updated:
+            return
+
     msg = await bot.send_message(
         chat_id=chat_id,
         text=build_list_text(chat_id),
@@ -206,7 +208,11 @@ async def create_and_pin_list(chat_id: int):
     data["list_message_id"] = msg.message_id
 
     try:
-        await bot.pin_chat_message(chat_id, msg.message_id, disable_notification=True)
+        await bot.pin_chat_message(
+            chat_id=chat_id,
+            message_id=msg.message_id,
+            disable_notification=True,
+        )
     except:
         pass
 
@@ -239,35 +245,26 @@ async def update_pinned(chat_id: int):
             parse_mode="HTML",
         )
         return True
-    except:
+
+    except Exception as e:
+        error_text = str(e).lower()
+
+        if "message is not modified" in error_text:
+            return True
+
         data["list_message_id"] = None
         return False
 
 
-async def update_bottom(chat_id: int):
+async def update_all(chat_id: int):
     data = get_group_data(chat_id)
 
-    if not data["bottom_message_id"]:
-        return False
-
-    try:
-        await bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=data["bottom_message_id"],
-            text=build_list_text(chat_id),
-            reply_markup=get_inline_keyboard(),
-            parse_mode="HTML",
-        )
-        return True
-    except:
-        data["bottom_message_id"] = None
-        return False
-
-
-async def update_all(chat_id: int):
-    if not await update_pinned(chat_id):
+    if data["list_message_id"]:
+        updated = await update_pinned(chat_id)
+        if not updated:
+            await create_and_pin_list(chat_id)
+    else:
         await create_and_pin_list(chat_id)
-    await update_bottom(chat_id)
 
 
 @dp.message(Command("start"))
@@ -277,7 +274,8 @@ async def start(message: Message):
 
     await message.answer("♻️ جاري التحديث...", reply_markup=ReplyKeyboardRemove())
     await message.answer("✅ تم التفعيل")
-    await create_and_pin_list(message.chat.id)
+
+    await update_all(message.chat.id)
 
 
 @dp.message(F.text == "كمل")
@@ -288,7 +286,7 @@ async def continue_list(message: Message):
     await send_new_bottom(message.chat.id)
 
 
-@dp.message(F.text == "بدء قائمة جديده")
+@dp.message(F.text == "بدء قايمة جديده")
 async def new_list_text(message: Message):
     if not await is_group_admin(message.chat.id, message.from_user.id):
         return
@@ -298,41 +296,8 @@ async def new_list_text(message: Message):
     data["is_open"] = False
     data["bottom_message_id"] = None
 
-    await send_new_bottom(message.chat.id)
-
-
-@dp.message(F.text == "📋 عرض القائمة")
-async def show_list(message: Message):
-    if not await is_group_admin(message.chat.id, message.from_user.id):
-        return
-    await send_new_bottom(message.chat.id)
-
-
-@dp.message(F.text == "🔄 تحديث القائمة")
-async def refresh(message: Message):
-    if not await is_group_admin(message.chat.id, message.from_user.id):
-        return
     await update_all(message.chat.id)
-
-
-@dp.message(F.text == "📤 إرسال القائمة")
-async def send_bottom_btn(message: Message):
-    if not await is_group_admin(message.chat.id, message.from_user.id):
-        return
     await send_new_bottom(message.chat.id)
-
-
-@dp.message(F.text == "🆕 بدء حلقة جديدة")
-async def new_session(message: Message):
-    if not await is_group_admin(message.chat.id, message.from_user.id):
-        return
-
-    data = get_group_data(message.chat.id)
-    data["attendance"].clear()
-    data["is_open"] = False
-    data["bottom_message_id"] = None
-
-    await update_all(message.chat.id)
 
 
 @dp.callback_query()
@@ -356,11 +321,6 @@ async def buttons(c: CallbackQuery):
         if not await is_group_admin(chat_id, user_id):
             return await c.answer("❌ للأدمن فقط", show_alert=True)
         data["is_open"] = False
-
-    elif c.data == "send_bottom":
-        if not await is_group_admin(chat_id, user_id):
-            return await c.answer("❌ للأدمن فقط", show_alert=True)
-        await send_new_bottom(chat_id)
 
     elif c.data == "register":
         if not data["is_open"]:
