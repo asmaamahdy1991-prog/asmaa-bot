@@ -193,11 +193,6 @@ def build_list_text(chat_id: int):
 async def create_and_pin_list(chat_id: int):
     data = get_group_data(chat_id)
 
-    if data["list_message_id"]:
-        updated = await update_pinned(chat_id)
-        if updated:
-            return
-
     msg = await bot.send_message(
         chat_id=chat_id,
         text=build_list_text(chat_id),
@@ -245,26 +240,23 @@ async def update_pinned(chat_id: int):
             parse_mode="HTML",
         )
         return True
-
     except Exception as e:
         error_text = str(e).lower()
 
         if "message is not modified" in error_text:
             return True
 
-        data["list_message_id"] = None
+        print("update_pinned error:", repr(e))
         return False
 
 
 async def update_all(chat_id: int):
     data = get_group_data(chat_id)
 
-    if data["list_message_id"]:
-        updated = await update_pinned(chat_id)
-        if not updated:
-            await create_and_pin_list(chat_id)
-    else:
-        await create_and_pin_list(chat_id)
+    if not data["list_message_id"]:
+        return
+
+    await update_pinned(chat_id)
 
 
 @dp.message(Command("start"))
@@ -275,7 +267,13 @@ async def start(message: Message):
     await message.answer("♻️ جاري التحديث...", reply_markup=ReplyKeyboardRemove())
     await message.answer("✅ تم التفعيل")
 
-    await update_all(message.chat.id)
+    data = get_group_data(message.chat.id)
+    data["attendance"].clear()
+    data["is_open"] = False
+    data["list_message_id"] = None
+    data["bottom_message_id"] = None
+
+    await create_and_pin_list(message.chat.id)
 
 
 @dp.message(F.text == "كمل")
@@ -294,9 +292,10 @@ async def new_list_text(message: Message):
     data = get_group_data(message.chat.id)
     data["attendance"].clear()
     data["is_open"] = False
+    data["list_message_id"] = None
     data["bottom_message_id"] = None
 
-    await update_all(message.chat.id)
+    await create_and_pin_list(message.chat.id)
     await send_new_bottom(message.chat.id)
 
 
