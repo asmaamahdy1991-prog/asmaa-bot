@@ -25,6 +25,7 @@ dp = Dispatcher()
 groups_data = {}
 
 
+
 def get_group_data(chat_id: int):
     if chat_id not in groups_data:
         groups_data[chat_id] = {
@@ -34,6 +35,60 @@ def get_group_data(chat_id: int):
             "bottom_message_id": None,
         }
     return groups_data[chat_id]
+
+
+def get_arabic_date():
+    mecca_tz = pytz.timezone("Asia/Riyadh")
+    now = datetime.now(mecca_tz)
+
+    days = {
+        "Saturday": "السبت",
+        "Sunday": "الأحد",
+        "Monday": "الإثنين",
+        "Tuesday": "الثلاثاء",
+        "Wednesday": "الأربعاء",
+        "Thursday": "الخميس",
+        "Friday": "الجمعة",
+    }
+
+    months = {
+        "January": "يناير",
+        "February": "فبراير",
+        "March": "مارس",
+        "April": "أبريل",
+        "May": "مايو",
+        "June": "يونيو",
+        "July": "يوليو",
+        "August": "أغسطس",
+        "September": "سبتمبر",
+        "October": "أكتوبر",
+        "November": "نوفمبر",
+        "December": "ديسمبر",
+    }
+
+    day_name = days[now.strftime("%A")]
+    month_name = months[now.strftime("%B")]
+
+    date_str = f"{day_name} - {now.day} {month_name} {now.year}"
+
+    hour = now.hour
+    minute = now.strftime("%M")
+
+    if hour == 0:
+        hour = 12
+        period = "صباحًا"
+    elif hour < 12:
+        period = "صباحًا"
+    elif hour == 12:
+        period = "مساءً"
+    else:
+        hour -= 12
+        period = "مساءً"
+
+    time_str = f"{hour}:{minute} {period}"
+
+    return date_str, time_str
+
 
 
 async def is_group_admin(chat_id: int, user_id: int) -> bool:
