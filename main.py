@@ -122,7 +122,7 @@ async def send_list(chat_id: int):
     get_group_data(chat_id)["list_message_id"] = msg.message_id
 
 
-async def update(chat_id: int):
+async def update(chat_id):
     data = get_group_data(chat_id)
     if not data["list_message_id"]:
         return
@@ -136,7 +136,8 @@ async def update(chat_id: int):
             parse_mode="HTML",
         )
     except Exception as e:
-        logging.error(f"Update error: {e}")
+        if "message is not modified" not in str(e).lower():
+            logging.error(f"Update error: {e}")
 
 
 @dp.message(Command("start"))
@@ -244,9 +245,8 @@ async def handle_buttons(callback: CallbackQuery):
 
     elif callback.data == "del":
         data["attendance"].pop(user_id, None)
-
-    await callback.answer("تم")
-    await update(chat_id)
+await update(chat)
+await c.answer("تم")
 
 
 @dp.message()
