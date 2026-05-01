@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 from datetime import datetime
@@ -7,12 +8,7 @@ from html import escape
 import pytz
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
-from aiogram.types import (
-    CallbackQuery,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    Message,
-)
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 logging.basicConfig(level=logging.INFO)
 
@@ -23,18 +19,42 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-groups_data = {}
+DATA_FILE = "groups.json"
 
 
-def get_group_data(chat_id: int):
-    if chat_id not in groups_data:
-        groups_data[chat_id] = {
+# =======================
+# 📦 Storage (persistent)
+# =======================
+
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def save_data():
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(groups_data, f, ensure_ascii=False, indent=2)
+
+
+groups_data = load_data()
+
+
+def get_group(chat_id: int):
+    cid = str(chat_id)
+    if cid not in groups_data:
+        groups_data[cid] = {
             "is_open": False,
             "attendance": {},
             "list_message_id": None,
         }
-    return groups_data[chat_id]
+    return groups_data[cid]
 
+
+# =======================
+# ⏰ Time
+# =======================
 
 def get_time():
     tz = pytz.timezone("Asia/Riyadh")
@@ -42,19 +62,23 @@ def get_time():
     return now.strftime("%Y-%m-%d"), now.strftime("%H:%M")
 
 
+# =======================
+# 👤 Admin check
+# =======================
+
 async def is_admin(chat_id: int, user_id: int) -> bool:
     try:
-        member = await bot.get_chat_member(chat_id, user_id)
-        return member.status in ["administrator", "creator"]
-    except Exception:
+        m = await bot.get_chat_member(chat_id, user_id)
+        return m.status in ["administrator", "creator"]
+    except:
         return False
 
 
-def make_link(user_id: int, name: str) -> str:
-    return f'<a href="tg://user?id={user_id}">{escape(name)}</a>'
+# =======================
+# 👇 UI
+# =======================
 
-
-def keyboard() -> InlineKeyboardMarkup:
+def keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -74,42 +98,41 @@ def keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def build(chat_id: int) -> str:
-    data = get_group_data(chat_id)
+def build(chat_id: int):
+    data = get_group(chat_id)
     date, time = get_time()
 
     status = "🟢 مفتوحة" if data["is_open"] else "🔴 مغلقة"
 
     teachers, students, listeners = [], [], []
 
-    for user in data["attendance"].values():
-        name = make_link(user["id"], user["name"])
-        if user["read"]:
+    for u in data["attendance"].values():
+        name = f'<a href="tg://user?id={u["id"]}">{escape(u["name"])}</a>'
+        if u["read"]:
             name += " ✅"
 
-        if user["type"] == "teacher":
+        if u["type"] == "teacher":
             teachers.append(name)
-        elif user["type"] == "listener":
+        elif u["type"] == "listener":
             listeners.append(name)
         else:
             students.append(name)
 
-    text = f"""📅 {date}
+    return f"""
+📅 {date}
 ⏱ {time}
 
 📌 الحالة: {status}
 
 📚 المعلمات:
+{chr(10).join(teachers) if teachers else "لا يوجد"}
+
+📝 الطالبات:
+{chr(10).join(students) if students else "لا يوجد"}
+
+🎧 المستمعات:
+{chr(10).join(listeners) if listeners else "لا يوجد"}
 """
-    text += "\n".join(teachers) or "لا يوجد"
-
-    text += "\n\n📝 الطالبات:\n"
-    text += "\n".join(students) or "لا يوجد"
-
-    text += "\n\n🎧 المستمعات:\n"
-    text += "\n".join(listeners) or "لا يوجد"
-
-    return text
 
 
 async def send_list(chat_id: int):
@@ -119,11 +142,14 @@ async def send_list(chat_id: int):
         reply_markup=keyboard(),
         parse_mode="HTML",
     )
-    get_group_data(chat_id)["list_message_id"] = msg.message_id
+
+    get_group(chat_id)["list_message_id"] = msg.message_id
+    save_data()
 
 
 async def update(chat_id: int):
-    data = get_group_data(chat_id)
+    data = get_group(chat_id)
+
     if not data["list_message_id"]:
         return
 
@@ -136,124 +162,123 @@ async def update(chat_id: int):
             parse_mode="HTML",
         )
     except Exception as e:
-        if "message is not modified" not in str(e).lower():
-            logging.error(f"Update error: {e}")
+        logging.warning(e)
 
+
+# =======================
+# 🚀 Commands
+# =======================
 
 @dp.message(Command("start"))
 async def start(message: Message):
     if not await is_admin(message.chat.id, message.from_user.id):
         return
 
-    data = get_group_data(message.chat.id)
-    data["attendance"].clear()
-    data["is_open"] = True
-    data["list_message_id"] = None
+    g = get_group(message.chat.id)
+    g["attendance"].clear()
+    g["is_open"] = True
+    g["list_message_id"] = None
 
+    save_data()
+    await send_list(message.chat.id)
+
+
+@dp.message(F.text.in_({"بدء قائمة جديده", "بدء قايمة جديده"}))
+async def new_list(message: Message):
+    if not await is_admin(message.chat.id, message.from_user.id):
+        return
+
+    g = get_group(message.chat.id)
+    g["attendance"].clear()
+    g["is_open"] = True
+    g["list_message_id"] = None
+
+    save_data()
     await send_list(message.chat.id)
 
 
 @dp.message(F.text == "كمل")
 async def send_bottom(message: Message):
-    if not await is_admin(message.chat.id, message.from_user.id):
-        return
-
-    await bot.send_message(
-        message.chat.id,
-        build(message.chat.id),
-        reply_markup=keyboard(),
-        parse_mode="HTML",
-    )
+    await message.answer(build(message.chat.id), reply_markup=keyboard(), parse_mode="HTML")
 
 
-@dp.message(F.text.in_({"بدء قايمة جديده", "بدء قائمة جديده"}))
-async def new_list(message: Message):
-    if not await is_admin(message.chat.id, message.from_user.id):
-        return
-
-    data = get_group_data(message.chat.id)
-    data["attendance"].clear()
-    data["is_open"] = True
-    data["list_message_id"] = None
-
-    await send_list(message.chat.id)
-
+# =======================
+# 🎛 Buttons
+# =======================
 
 @dp.callback_query()
-async def handle_buttons(callback: CallbackQuery):
-    if not callback.message:
-        return
+async def handler(call: CallbackQuery):
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+    name = call.from_user.full_name
 
-    chat_id = callback.message.chat.id
-    user_id = callback.from_user.id
-    full_name = callback.from_user.full_name
+    g = get_group(chat_id)
 
-    data = get_group_data(chat_id)
+    if call.data == "open":
+        g["is_open"] = True
+        await call.answer("تم الفتح")
 
-    if callback.data == "open":
-        data["is_open"] = True
+    elif call.data == "close":
+        g["is_open"] = False
+        await call.answer("تم الإغلاق")
 
-    elif callback.data == "close":
-        data["is_open"] = False
+    elif call.data == "reg":
+        if not g["is_open"]:
+            return await call.answer("القائمة مغلقة", show_alert=True)
 
-    elif callback.data == "reg":
-        if not data["is_open"]:
-            await callback.answer("القائمة مغلقة", show_alert=True)
-            return
+        if str(user_id) in g["attendance"]:
+            return await call.answer("أنت مسجل بالفعل", show_alert=True)
 
-        if user_id in data["attendance"]:
-            await callback.answer("أنتِ مسجلة بالفعل", show_alert=True)
-            return
-
-        data["attendance"][user_id] = {
+        g["attendance"][str(user_id)] = {
             "id": user_id,
-            "name": full_name,
+            "name": name,
             "type": "student",
             "read": False,
         }
+        await call.answer("تم التسجيل")
 
-    elif callback.data == "teacher":
-        if not data["is_open"]:
-            await callback.answer("القائمة مغلقة", show_alert=True)
-            return
+    elif call.data == "teacher":
+        if str(user_id) in g["attendance"]:
+            return await call.answer("أنت مسجل بالفعل", show_alert=True)
 
-        data["attendance"][user_id] = {
+        g["attendance"][str(user_id)] = {
             "id": user_id,
-            "name": full_name,
+            "name": name,
             "type": "teacher",
             "read": False,
         }
+        await call.answer("تم تسجيل معلمة")
 
-    elif callback.data == "listen":
-        if not data["is_open"]:
-            await callback.answer("القائمة مغلقة", show_alert=True)
-            return
+    elif call.data == "listen":
+        if str(user_id) in g["attendance"]:
+            return await call.answer("أنت مسجل بالفعل", show_alert=True)
 
-        data["attendance"][user_id] = {
+        g["attendance"][str(user_id)] = {
             "id": user_id,
-            "name": full_name,
+            "name": name,
             "type": "listener",
             "read": False,
         }
+        await call.answer("تم تسجيل مستمعة")
 
-    elif callback.data == "read":
-        if user_id not in data["attendance"]:
-            await callback.answer("سجلي أولًا", show_alert=True)
-            return
+    elif call.data == "read":
+        if str(user_id) not in g["attendance"]:
+            return await call.answer("سجل أولاً", show_alert=True)
 
-        data["attendance"][user_id]["read"] = True
+        g["attendance"][str(user_id)]["read"] = True
+        await call.answer("تم التحديث")
 
-    elif callback.data == "del":
-        data["attendance"].pop(user_id, None)
+    elif call.data == "del":
+        g["attendance"].pop(str(user_id), None)
+        await call.answer("تم الحذف")
 
-    await callback.answer("تم")
+    save_data()
     await update(chat_id)
 
 
-@dp.message()
-async def ignore(_: Message):
-    pass
-
+# =======================
+# ▶️ Run
+# =======================
 
 async def main():
     await bot.delete_webhook(drop_pending_updates=True)
