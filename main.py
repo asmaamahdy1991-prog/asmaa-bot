@@ -251,7 +251,7 @@ async def btn(c: CallbackQuery):
         data["attendance"].pop(uid, None)
 
     await c.answer("تم")
-    asyncio.create_task(update(chat))
+    await update(chat)
 
 
 @dp.message()
